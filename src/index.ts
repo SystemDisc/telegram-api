@@ -15,6 +15,9 @@ const server = Fastify({
   logger: true,
 });
 
+const telegramLogger = server.log.child({ module: 'telegram' });
+Object.assign(telegramLogger, { canSend: () => false });
+
 server.get('/', async (req, res) => {
   return 'It worked!';
 });
@@ -33,6 +36,7 @@ server.post<{ Body: LoginBodyType; }>('/login', {
   const id = uuid.v4();
   const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
     connectionRetries: 5,
+    baseLogger: telegramLogger,
   });
   clients.set(id, client);
   const loginPromise = client.start({
@@ -103,6 +107,7 @@ server.post<{ Body: SendMessageBodyType; }>('/sendMessage', async (req, res) => 
   try {
     const client = new TelegramClient(new StringSession(req.body.sessionString), apiId, apiHash, {
       connectionRetries: 5,
+      baseLogger: telegramLogger,
     });
     await client.connect();
     await client.sendMessage(req.body.to, { message: req.body.message });
@@ -116,34 +121,8 @@ server.post<{ Body: SendMessageBodyType; }>('/sendMessage', async (req, res) => 
 });
 
 (async () => {
-  await server.listen(3000, '0.0.0.0');
+  await server.listen(3000);
 })().catch(e => {
   server.log.error(e);
   process.exit(1);
 });
-
-/*
-import { TelegramClient } from 'telegram';
-import { StringSession } from 'telegram/sessions';
-
-const apiId = 8785191;
-const apiHash = "2d992b9e1de1379ee28e9d027fc3b716";
-const stringSession = new StringSession("1AQAOMTQ5LjE1NC4xNzUuNTkBu6zPQwwIcZOUjxXlJnzkdHYcXTjWz4fvdmqET5FvtLYenYpIS8Xx2glqy6QIlVX+qYfDdTcTdapuwvkXFz3eiAl9iKhe/i3ZqJIQrKw6l0GdPcdmLhsVS21VOQFhNGCveXB9qQaA0v6w7GYwRrsyaB+3MWOkSZOwTu5sZbxWm6N34jyF8TndBf4JsDIEaiJdXWreGnDlevFAzfUx0xYcXg8oToAe3asH+sufEvvHMwB6Y33QFEJ/YpOHkGD5nXqwoWcztZ028POAlpFClrGJqJ5nMs1jpskoKMUUsqq79geqoUytF85Src25VBqIsn+B9a2RkODrqs88SPQKdEpvPxY=");
-
-(async () => {
-  console.log("Loading interactive example...");
-  const client = new TelegramClient(stringSession, apiId, apiHash, {
-    connectionRetries: 5,
-  });
-  await client.start({
-    phoneNumber: async () => await '+15855327962',
-    password: async () => await '',
-    phoneCode: async () => await '1234',
-    onError: (err) => console.log(err),
-  });
-  console.log("You should now be connected.");
-  console.log(client.session.save()); // Save this string to avoid logging in again
-  await client.sendMessage("me", { message: "Hello!" });
-  await client.disconnect();
-})();
-*/
